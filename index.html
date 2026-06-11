@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Music Quiz</title>
+    <title>Music Quiz (Desktop Edition)</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -11,42 +11,29 @@
             --accent-color: #ff0055;
             --text-color: #ffffff;
         }
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--bg-color);
+        body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            overflow: hidden;
-        }
-        /* The game board sits perfectly over the video player */
-        .game-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: var(--bg-color);
-            z-index: 10;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 20px;
+            min-height: 100vh;
             box-sizing: border-box;
-            text-align: center;
         }
         .container {
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             background: var(--card-color);
             padding: 30px;
             border-radius: 20px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            box-sizing: border-box;
+            text-align: center;
         }
-        h1 { font-size: 1.8rem; margin: 0 0 20px 0; color: var(--accent-color); }
+        h1 { font-size: 1.8rem; margin-bottom: 20px; color: var(--accent-color); }
         input[type="text"] {
             width: 100%;
             padding: 12px;
@@ -87,9 +74,9 @@
             cursor: pointer;
             margin-bottom: 10px;
         }
-        button:disabled { background: #444; }
-        .game-ui { display: none; width: 100%; }
-        .timer { font-size: 4rem; font-weight: bold; margin: 20px 0; color: #ffcc00; }
+        button:disabled { background: #444; cursor: not-allowed; }
+        .game-ui { display: none; margin-top: 20px; }
+        .timer { font-size: 3.5rem; font-weight: bold; margin: 20px 0; color: #ffcc00; }
         .answer-box {
             background: #2a2a2a;
             padding: 15px;
@@ -99,58 +86,55 @@
             font-weight: bold;
             display: none;
             border: 1px solid #444;
-            word-wrap: break-word;
         }
-        /* Keeps video rendering natively on screen underneath the layout */
-        #yt-player {
+        /* Completely hides the video box visually on desktop browsers */
+        #player-container {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
+            visibility: hidden;
+            width: 1px;
+            height: 1px;
         }
     </style>
 </head>
 <body>
 
-    <div id="yt-player"></div>
-
-    <div class="game-overlay">
-        <div class="container">
-            <h1>🎵 Song Guesser</h1>
+    <div class="container">
+        <h1>🎵 Music Quiz</h1>
+        
+        <div id="setup-ui">
+            <p style="margin-top:0;">Paste your YouTube Music Playlist URL:</p>
+            <input type="text" id="playlist-url" placeholder="https://music.youtube.com/playlist?list=..." />
             
-            <div id="setup-ui">
-                <input type="text" id="playlist-url" placeholder="Paste YouTube Link Here..." />
-                
-                <div class="slider-group">
-                    <label>Start Position: <span id="start-val">30%</span></label>
-                    <input type="range" id="start-percent" min="0" max="80" step="5" value="30" oninput="document.getElementById('start-val').innerText = this.value + '%'">
-                </div>
-
-                <div class="slider-group">
-                    <label>Play Duration: <span id="duration-val">10s</span></label>
-                    <input type="range" id="play-duration" min="2" max="30" step="1" value="10" oninput="document.getElementById('duration-val').innerText = this.value + 's'">
-                </div>
-
-                <button id="start-btn" onclick="initGame()">Load Game</button>
+            <div class="slider-group">
+                <label>Start Position: <span id="start-val">30%</span></label>
+                <input type="range" id="start-percent" min="0" max="80" step="5" value="30" oninput="document.getElementById('start-val').innerText = this.value + '%'">
             </div>
 
-            <div id="game-ui" class="game-ui">
-                <div id="track-number" style="color: #aaa;">Preparing tracks...</div>
-                <div class="timer" id="timer-display">--</div>
-                
-                <button id="play-clip-btn" onclick="playCurrentClip()" style="background: #2a9d8f;">▶️ Play Clip</button>
-                <button id="action-btn" onclick="revealAnswer()" style="display: none;">Reveal Answer</button>
-                <button id="next-btn" onclick="nextSong()" style="background: #00b4d8; display: none;">Next Song ➡️</button>
-                
-                <div class="answer-box" id="answer-box"></div>
+            <div class="slider-group">
+                <label>Play Duration: <span id="duration-val">10s</span></label>
+                <input type="range" id="play-duration" min="2" max="30" step="1" value="10" oninput="document.getElementById('duration-val').innerText = this.value + 's'">
             </div>
+
+            <button id="start-btn" onclick="initGame()">Start Game</button>
+        </div>
+
+        <div id="game-ui" class="game-ui">
+            <div id="track-number" style="color: #aaa;">Loading playlist configuration...</div>
+            <div class="timer" id="timer-display">--</div>
+            
+            <button id="action-btn" onclick="revealAnswer()">Reveal Answer</button>
+            <button id="next-btn" onclick="nextSong()" style="background: #00b4d8; display: none;">Next Song ➡️</button>
+            
+            <div class="answer-box" id="answer-box"></div>
         </div>
     </div>
 
+    <div id="player-container">
+        <div id="yt-player"></div>
+    </div>
+
     <script>
-        // Inject API asynchronously
+        // Load the API
         const tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         document.head.appendChild(tag);
@@ -158,11 +142,17 @@
         let player;
         let timerInterval;
         let timeLeft = 10;
+        let isPlaylistLoaded = false;
+        
         let configStartPercent = 0.30;
         let configPlayDuration = 10;
-        let hasShuffled = false;
+
+        function onYouTubeIframeAPIReady() {
+            console.log("API Ready");
+        }
 
         function extractPlaylistId(url) {
+            // Updated regex pattern specifically allowed to trap negative symbols, hyphens, and underscores in standard/music IDs
             const reg = /[&?]list=([^#\&\?]+)/;
             const match = url.match(reg);
             return (match && match[1]) ? match[1] : null;
@@ -173,7 +163,7 @@
             const playlistId = extractPlaylistId(urlInput);
 
             if (!playlistId) {
-                alert("Please pass a valid playlist link containing a list ID!");
+                alert("Could not process playlist ID. Please verify the URL contains '?list='");
                 return;
             }
 
@@ -181,18 +171,14 @@
             configPlayDuration = parseInt(document.getElementById('play-duration').value);
 
             document.getElementById('start-btn').disabled = true;
-            document.getElementById('start-btn').innerText = "Connecting...";
+            document.getElementById('start-btn').innerText = "Shuffling Tracks...";
 
-            // Initialize YouTube player frames natively inline
             player = new YT.Player('yt-player', {
-                height: '100%',
-                width: '100%',
                 playerVars: {
                     listType: 'playlist',
                     list: playlistId,
                     autoplay: 0,
                     controls: 0,
-                    playsinline: 1, // Crucial for mobile safari inline rendering
                     disablekb: 1
                 },
                 events: {
@@ -203,45 +189,35 @@
         }
 
         function onPlayerReady(event) {
+            player.setShuffle(true);
+            
             document.getElementById('setup-ui').style.display = 'none';
             document.getElementById('game-ui').style.display = 'block';
-            document.getElementById('timer-display').innerText = configPlayDuration;
             
-            // Queue first array elements
-            updateTrackInfo();
-        }
-
-        // Action step: Forced manual mobile tap to start music stream
-        function playCurrentClip() {
-            document.getElementById('play-clip-btn').disabled = true;
-            document.getElementById('play-clip-btn').innerText = "Seeking...";
-            
-            if (!hasShuffled) {
-                player.setShuffle(true);
-                hasShuffled = true;
-                // Give player a brief moment to randomize queue index
-                setTimeout(() => { player.playVideo(); }, 400);
-            } else {
-                player.playVideo();
-            }
+            // Desktop browsers allow immediate hand-off play commands safely
+            setTimeout(() => {
+                player.playVideoAt(0);
+            }, 800);
         }
 
         function onPlayerStateChange(event) {
             if (event.data == YT.PlayerState.PLAYING) {
+                if (!isPlaylistLoaded) {
+                    isPlaylistLoaded = true;
+                    player.setShuffle(true);
+                }
+
                 const duration = player.getDuration();
                 const currentPosition = player.getCurrentTime();
                 const targetStartSec = Math.floor(duration * configStartPercent);
 
-                // Run validation check to see if we need to skip deep into the song
-                if (currentPosition < targetStartSec - 3 || currentPosition > targetStartSec + 3) {
+                if (currentPosition < targetStartSec - 2 || currentPosition > targetStartSec + 2) {
                     player.seekTo(targetStartSec, true);
-                } else {
-                    // We are at our 30% mark. Update UI buttons and execute countdown clock
-                    document.getElementById('play-clip-btn').style.display = 'none';
-                    document.getElementById('action-btn').style.display = 'block';
-                    updateTrackInfo();
-                    startTimer();
+                    return; 
                 }
+
+                updateTrackInfo();
+                startTimer();
             }
         }
 
@@ -266,9 +242,8 @@
 
         function updateTrackInfo() {
             const index = player.getPlaylistIndex() + 1 || 1;
-            const list = player.getPlaylist();
-            const total = list ? list.length : '??';
-            document.getElementById('track-number').innerText = `Track ${index} of ${total}`;
+            const total = player.getPlaylist() ? player.getPlaylist().length : '??';
+            document.getElementById('track-number').innerText = `Playing Song ${index} of ${total}`;
         }
 
         function revealAnswer() {
@@ -277,10 +252,10 @@
 
             const videoData = player.getVideoData();
             const title = videoData.title || "Unknown Title";
-            const author = videoData.author || "Unknown Channel/Artist";
+            const author = videoData.author || "Unknown Artist";
 
             const answerBox = document.getElementById('answer-box');
-            answerBox.innerHTML = `🎵 ${title}<br><span style="font-size:0.9rem; color:#aaa;">Source: ${author}</span>`;
+            answerBox.innerHTML = `🎵 ${title}<br><span style="font-size:0.9rem; color:#aaa;">Artist/Channel: ${author}</span>`;
             answerBox.style.display = 'block';
 
             document.getElementById('action-btn').style.display = 'none';
@@ -288,12 +263,9 @@
         }
 
         function nextSong() {
-            // Clean interface slate
             document.getElementById('answer-box').style.display = 'none';
             document.getElementById('next-btn').style.display = 'none';
-            document.getElementById('play-clip-btn').style.display = 'block';
-            document.getElementById('play-clip-btn').disabled = false;
-            document.getElementById('play-clip-btn').innerText = "▶️ Play Clip";
+            document.getElementById('action-btn').style.display = 'block';
             document.getElementById('track-number').innerText = "Loading next track...";
             document.getElementById('timer-display').innerText = configPlayDuration;
             document.getElementById('timer-display').style.color = '#ffcc00';
