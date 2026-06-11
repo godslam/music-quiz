@@ -286,6 +286,13 @@
 
             player.nextVideo();
         }
+
+        function extractPlaylistId(url) {
+            // Advanced regex that handles www.youtube.com, music.youtube.com, and mobile links
+            const reg = /[&?]list=([^#\&\?]+)/;
+            const match = url.match(reg);
+            return (match && match[1]) ? match[1] : null;
+        }
     </script>
 </body>
 </html>
