@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Song Guesser</title>
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-color: #1e1e1e;
+            --accent-color: #ff0055;
+            --text-color: #ffffff;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 450px;
+            background: var(--card-color);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        h1 { font-size: 1.8rem; margin-bottom: 20px; color: var(--accent-color); }
+        input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border-radius: 10px;
+            border: 2px solid #333;
+            background: #2a2a2a;
+            color: white;
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            margin-bottom: 10px;
+            transition: transform 0.1s;
+        }
+        button:active { transform: scale(0.98); }
+        button:disabled { background: #444; cursor: not-allowed; }
+        .game-ui { display: none; margin-top: 20px; }
+        .timer { font-size: 3.5rem; font-weight: bold; margin: 20px 0; color: #ffcc00; }
+        .answer-box {
+            background: #2a2a2a;
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 20px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            display: none;
+            border: 1px solid #444;
+        }
+        /* Crucial: Keeps YouTube player active/visible to the browser, but hidden from players */
+        #player-container {
+            position: absolute;
+            top: -9999px;
+            left: -9999px;
+            width: 200px;
+            height: 200px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎵 Song Guesser</h1>
+        
+        <div id="setup-ui">
+            <p>Paste a public YouTube Playlist URL below to begin:</p>
+            <input type="text" id="playlist-url" placeholder="https://www.youtube.com/playlist?list=..." />
+            <button id="start-btn" onclick="initGame()">Load Playlist</button>
+        </div>
+
+        <div id="game-ui" class="game-ui">
+            <div id="track-number" style="color: #aaa;">Song Loading...</div>
+            <div class="timer" id="timer-display">10</div>
+            
+            <button id="action-btn" onclick="revealAnswer()">Reveal Answer</button>
+            <button id="next-btn" onclick="nextSong()" style="background: #00b4d8; display: none;">Next Song ➡️</button>
+            
+            <div class="answer-box" id="answer-box"></div>
+        </div>
+    </div>
+
+    <div id="player-container">
+        <div id="yt-player"></div>
+    </div>
+
+    <script>
+        // Load the YouTube IFrame API script dynamically
+        const tag = document.createElement('script');
+        tag.src = "https://www.youtube.com/iframe_api";
+        const firstScriptTag = document.getElementsByTagName('script')[0];
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+        let player;
+        let timerInterval;
+        let timeLeft = 10;
+        let isPlaylistLoaded = false;
+
+        function onYouTubeIframeAPIReady() {
+            // API is loaded and ready, button can be used safely
+            console.log("YouTube API Ready");
+        }
+
+        function initGame() {
+            const urlInput = document.getElementById('playlist-url').value;
+            const playlistId = extractPlaylistId(urlInput);
+
+            if (!playlistId) {
+                alert("Please enter a valid YouTube Playlist URL!");
+                return;
+            }
+
+            document.getElementById('start-btn').disabled = true;
+            document.getElementById('start-btn').innerText = "Loading...";
+
+            // Initialize YouTube Player with the provided playlist
+            player = new YT.Player('yt-player', {
+                playerVars: {
+                    listType: 'playlist',
+                    list: playlistId,
+                    autoplay: 0,
+                    controls: 0,
+                    disablekb: 1,
+                    modestbranding: 1
+                },
+                events: {
+                    'onReady': onPlayerReady,
+                    'onStateChange': onPlayerStateChange
+                }
+            });
+        }
+
+        function extractPlaylistId(url) {
+            const reg = /[&?]list=([^#\&\?]+)/;
+            const match = url.match(reg);
+            return (match && match[1]) ? match[1] : null;
+        }
+
+        function onPlayerReady(event) {
+            // Shuffle playlist out of the gate so it's random every time
+            player.setShuffle(true);
+            
+            // Swap setup UI for active Game UI
+            document.getElementById('setup-ui').style.display = 'none';
+            document.getElementById('game-ui').style.display = 'block';
+            
+            // Queue up the first video
+            setTimeout(() => {
+                player.playVideoAt(0);
+            }, 1000);
+        }
+
+        function onPlayerStateChange(event) {
+            // YT.PlayerState.PLAYING means video started streaming
+            if (event.data == YT.PlayerState.PLAYING) {
+                if (!isPlaylistLoaded) {
+                    // Force playlist processing sync
+                    isPlaylistLoaded = true;
+                    player.setShuffle(true);
+                }
+                updateTrackInfo();
+                startTimer();
+            }
+        }
+
+        function startTimer() {
+            clearInterval(timerInterval);
+            timeLeft = 10;
+            document.getElementById('timer-display').innerText = timeLeft;
+            document.getElementById('timer-display').style.color = '#ffcc00';
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                document.getElementById('timer-display').innerText = timeLeft;
+
+                if (timeLeft <= 3) {
+                    document.getElementById('timer-display').style.color = '#ff0055'; // Flash warning red
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    player.pauseVideo();
+                    revealAnswer();
+                }
+            }, 1000);
+        }
+
+        function updateTrackInfo() {
+            const index = player.getPlaylistIndex() + 1;
+            const total = player.getPlaylist().length;
+            document.getElementById('track-number').innerText = `Playing Song ${index} of ${total}`;
+        }
+
+        function revealAnswer() {
+            clearInterval(timerInterval);
+            player.pauseVideo(); // Stop playing when answer is shown
+
+            // Get current video metadata
+            const videoData = player.getVideoData();
+            const title = videoData.title || "Unknown Title";
+            const author = videoData.author || "Unknown Artist";
+
+            const answerBox = document.getElementById('answer-box');
+            answerBox.innerHTML = `🎵 ${title}<br><span style="font-size:0.9rem; color:#aaa;">Uploaded by: ${author}</span>`;
+            answerBox.style.display = 'block';
+
+            // Toggle interface buttons
+            document.getElementById('action-btn').style.display = 'none';
+            document.getElementById('next-btn').style.display = 'block';
+        }
+
+        function nextSong() {
+            // Reset UI
+            document.getElementById('answer-box').style.display = 'none';
+            document.getElementById('next-btn').style.display = 'none';
+            document.getElementById('action-btn').style.display = 'block';
+            document.getElementById('track-number').innerText = "Loading next song...";
+            document.getElementById('timer-display').innerText = "10";
+            document.getElementById('timer-display').style.color = '#ffcc00';
+
+            // Play next video in the playlist array
+            player.nextVideo();
+        }
+    </script>
+</body>
+</html>
