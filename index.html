@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Music Quiz (Desktop Edition)</title>
+    <title>Music Quiz (Desktop Fixed)</title>
     <style>
         :root {
             --bg-color: #121212;
@@ -23,15 +23,29 @@
             justify-content: center;
             min-height: 100vh;
             box-sizing: border-box;
+            overflow: hidden;
         }
+        
+        /* FIX: Render the video frame at a normal size, but sink it deep behind the background layer */
+        #player-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 200px;
+            z-index: 1; /* Sits underneath the body card layout */
+        }
+
         .container {
             width: 100%;
             max-width: 450px;
             background: var(--card-color);
             padding: 30px;
             border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
             text-align: center;
+            position: relative;
+            z-index: 5; /* Forces the game card to layer entirely over the video box */
         }
         h1 { font-size: 1.8rem; margin-bottom: 20px; color: var(--accent-color); }
         input[type="text"] {
@@ -87,13 +101,6 @@
             display: none;
             border: 1px solid #444;
         }
-        /* Completely hides the video box visually on desktop browsers */
-        #player-container {
-            position: absolute;
-            visibility: hidden;
-            width: 1px;
-            height: 1px;
-        }
     </style>
 </head>
 <body>
@@ -134,7 +141,6 @@
     </div>
 
     <script>
-        // Load the API
         const tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         document.head.appendChild(tag);
@@ -152,7 +158,6 @@
         }
 
         function extractPlaylistId(url) {
-            // Updated regex pattern specifically allowed to trap negative symbols, hyphens, and underscores in standard/music IDs
             const reg = /[&?]list=([^#\&\?]+)/;
             const match = url.match(reg);
             return (match && match[1]) ? match[1] : null;
@@ -174,6 +179,8 @@
             document.getElementById('start-btn').innerText = "Shuffling Tracks...";
 
             player = new YT.Player('yt-player', {
+                height: '100%',
+                width: '100%',
                 playerVars: {
                     listType: 'playlist',
                     list: playlistId,
@@ -194,7 +201,6 @@
             document.getElementById('setup-ui').style.display = 'none';
             document.getElementById('game-ui').style.display = 'block';
             
-            // Desktop browsers allow immediate hand-off play commands safely
             setTimeout(() => {
                 player.playVideoAt(0);
             }, 800);
