@@ -34,16 +34,40 @@
             text-align: center;
         }
         h1 { font-size: 1.8rem; margin-bottom: 20px; color: var(--accent-color); }
-        input {
+        input[type="text"] {
             width: 100%;
             padding: 12px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             border-radius: 10px;
             border: 2px solid #333;
             background: #2a2a2a;
             color: white;
             font-size: 1rem;
             box-sizing: border-box;
+        }
+        .slider-group {
+            text-align: left;
+            margin-bottom: 20px;
+            background: #252525;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #333;
+        }
+        .slider-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            color: #ccc;
+            margin-bottom: 8px;
+        }
+        .slider-group span {
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+        input[type="range"] {
+            width: 100%;
+            accent-color: var(--accent-color);
+            margin: 0;
         }
         button {
             width: 100%;
@@ -72,7 +96,6 @@
             display: none;
             border: 1px solid #444;
         }
-        /* Crucial: Keeps YouTube player active/visible to the browser, but hidden from players */
         #player-container {
             position: absolute;
             top: -9999px;
@@ -88,8 +111,19 @@
         <h1>🎵 Song Guesser</h1>
         
         <div id="setup-ui">
-            <p>Paste a public YouTube Playlist URL below to begin:</p>
+            <p style="margin-top: 0;">Paste a public YouTube Playlist URL:</p>
             <input type="text" id="playlist-url" placeholder="https://www.youtube.com/playlist?list=..." />
+            
+            <div class="slider-group">
+                <label for="start-percent">Start Position: <span id="start-val">30%</span></label>
+                <input type="range" id="start-percent" min="0" max="80" step="5" value="30" oninput="document.getElementById('start-val').innerText = this.value + '%'">
+            </div>
+
+            <div class="slider-group">
+                <label for="play-duration">Play Duration: <span id="duration-val">10s</span></label>
+                <input type="range" id="play-duration" min="2" max="30" step="1" value="10" oninput="document.getElementById('duration-val').innerText = this.value + 's'">
+            </div>
+
             <button id="start-btn" onclick="initGame()">Load Playlist</button>
         </div>
 
@@ -109,7 +143,6 @@
     </div>
 
     <script>
-        // Load the YouTube IFrame API script dynamically
         const tag = document.createElement('script');
         tag.src = "https://www.youtube.com/iframe_api";
         const firstScriptTag = document.getElementsByTagName('script')[0];
@@ -119,9 +152,12 @@
         let timerInterval;
         let timeLeft = 10;
         let isPlaylistLoaded = false;
+        
+        // Game settings captured from sliders
+        let configStartPercent = 0.30;
+        let configPlayDuration = 10;
 
         function onYouTubeIframeAPIReady() {
-            // API is loaded and ready, button can be used safely
             console.log("YouTube API Ready");
         }
 
@@ -134,10 +170,13 @@
                 return;
             }
 
+            // Capture slider configurations
+            configStartPercent = parseInt(document.getElementById('start-percent').value) / 100;
+            configPlayDuration = parseInt(document.getElementById('play-duration').value);
+
             document.getElementById('start-btn').disabled = true;
             document.getElementById('start-btn').innerText = "Loading...";
 
-            // Initialize YouTube Player with the provided playlist
             player = new YT.Player('yt-player', {
                 playerVars: {
                     listType: 'playlist',
@@ -161,27 +200,34 @@
         }
 
         function onPlayerReady(event) {
-            // Shuffle playlist out of the gate so it's random every time
             player.setShuffle(true);
             
-            // Swap setup UI for active Game UI
             document.getElementById('setup-ui').style.display = 'none';
             document.getElementById('game-ui').style.display = 'block';
             
-            // Queue up the first video
             setTimeout(() => {
                 player.playVideoAt(0);
             }, 1000);
         }
 
         function onPlayerStateChange(event) {
-            // YT.PlayerState.PLAYING means video started streaming
             if (event.data == YT.PlayerState.PLAYING) {
                 if (!isPlaylistLoaded) {
-                    // Force playlist processing sync
                     isPlaylistLoaded = true;
                     player.setShuffle(true);
                 }
+
+                // Calculate the timestamp 30% (or config setting) into the song duration
+                const duration = player.getDuration();
+                const currentPosition = player.getCurrentTime();
+                const targetStartSec = Math.floor(duration * configStartPercent);
+
+                // If we haven't skipped forward to our target position yet, seek there now
+                if (currentPosition < targetStartSec - 2 || currentPosition > targetStartSec + 2) {
+                    player.seekTo(targetStartSec, true);
+                    return; // Return early; seeking triggers another PLAYING event where timer will start
+                }
+
                 updateTrackInfo();
                 startTimer();
             }
@@ -189,7 +235,7 @@
 
         function startTimer() {
             clearInterval(timerInterval);
-            timeLeft = 10;
+            timeLeft = configPlayDuration;
             document.getElementById('timer-display').innerText = timeLeft;
             document.getElementById('timer-display').style.color = '#ffcc00';
 
@@ -198,12 +244,11 @@
                 document.getElementById('timer-display').innerText = timeLeft;
 
                 if (timeLeft <= 3) {
-                    document.getElementById('timer-display').style.color = '#ff0055'; // Flash warning red
+                    document.getElementById('timer-display').style.color = '#ff0055';
                 }
 
                 if (timeLeft <= 0) {
                     clearInterval(timerInterval);
-                    player.pauseVideo();
                     revealAnswer();
                 }
             }, 1000);
@@ -217,9 +262,8 @@
 
         function revealAnswer() {
             clearInterval(timerInterval);
-            player.pauseVideo(); // Stop playing when answer is shown
+            player.pauseVideo();
 
-            // Get current video metadata
             const videoData = player.getVideoData();
             const title = videoData.title || "Unknown Title";
             const author = videoData.author || "Unknown Artist";
@@ -228,21 +272,18 @@
             answerBox.innerHTML = `🎵 ${title}<br><span style="font-size:0.9rem; color:#aaa;">Uploaded by: ${author}</span>`;
             answerBox.style.display = 'block';
 
-            // Toggle interface buttons
             document.getElementById('action-btn').style.display = 'none';
             document.getElementById('next-btn').style.display = 'block';
         }
 
         function nextSong() {
-            // Reset UI
             document.getElementById('answer-box').style.display = 'none';
             document.getElementById('next-btn').style.display = 'none';
             document.getElementById('action-btn').style.display = 'block';
             document.getElementById('track-number').innerText = "Loading next song...";
-            document.getElementById('timer-display').innerText = "10";
+            document.getElementById('timer-display').innerText = configPlayDuration;
             document.getElementById('timer-display').style.color = '#ffcc00';
 
-            // Play next video in the playlist array
             player.nextVideo();
         }
     </script>
